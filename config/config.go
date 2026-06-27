@@ -21,7 +21,6 @@ import (
 //	DAS_PLAN_TTL             3600                            计划结果在内存中保留的秒数
 //	DAS_CONFIGMAP_NAME       das-init-script                 init script ConfigMap 名称
 //	DAS_SSH_SECRET_NAME      codeup-ssh                      git ssh 私钥 Secret 名称
-//	DAS_GRADLE_CACHE_PVC     gradle-dist-cache               Gradle 发行版缓存 PVC 名称
 //	DAS_LOCAL_MODE           false                           本地开发模式（跳过 K8s，直接 exec gradlew）
 //	DAS_MYSQL_DSN            —                                MySQL 连接串（设置后启用自驱动分析，可直接读 gps_repos 表）
 //	DAS_AKASHA_API_URL       —                                akasha gradle.properties API 完整 URL
@@ -36,7 +35,6 @@ type Config struct {
 	PlanTTL         int // 秒
 	ConfigmapName   string
 	SSHSecretName   string
-	GradleCachePVC  string
 	LocalMode       bool
 	MySQLDSN        string
 	AkashaAPIURL    string // akasha gradle.properties API 完整 URL（如 http://akasha:8080/api/v1/gradle-properties）
@@ -58,7 +56,6 @@ func Load() *Config {
 		PlanTTL:        getEnvInt("DAS_PLAN_TTL", 3600),
 		ConfigmapName:  getEnv("DAS_CONFIGMAP_NAME", "das-init-script"),
 		SSHSecretName:  getEnv("DAS_SSH_SECRET_NAME", "codeup-ssh"),
-		GradleCachePVC: getEnv("DAS_GRADLE_CACHE_PVC", "gradle-dist-cache"),
 		LocalMode:      getEnv("DAS_LOCAL_MODE", "false") == "true",
 		MySQLDSN:       getEnv("DAS_MYSQL_DSN", ""),
 			AkashaAPIURL:   getEnv("DAS_AKASHA_API_URL", ""),

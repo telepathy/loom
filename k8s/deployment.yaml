@@ -39,8 +39,6 @@ spec:
               value: "das-init-script"
             - name: DAS_SSH_SECRET_NAME
               value: "codeup-ssh"
-            - name: DAS_GRADLE_CACHE_PVC
-              value: "gradle-dist-cache"
             # ── 运行参数 ──
             - name: DAS_MAX_PARALLEL
               value: "5"

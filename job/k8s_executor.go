@@ -92,7 +92,6 @@ func (e *K8sExecutor) Execute(ctx context.Context, planID string, rs *model.Repo
 		Namespace:       e.namespace,
 		ConfigmapName:   e.cfg.ConfigmapName,
 		SSHSecretName:   e.cfg.SSHSecretName,
-		GradleCachePVC:  e.cfg.GradleCachePVC,
 		JobTimeout:      e.cfg.JobTimeout,
 	})
 	if err != nil {
@@ -139,7 +138,7 @@ git clone --depth 1 --branch $ref %s /work/src
 chmod -R u+w /work/src%s`,
 		refStr(data), data.RepoURL, akashaFetchScript(e.cfg.AkashaAPIURL, data.AkashaBranch))
 
-	// analyze container 脚本：gradlew → 回调（不再需要 -PdepBranch）
+	// analyze container 脚本：gradlew → 回调
 	analyzeScript := `set -e
 ./gradlew --init-script /scripts/das.gradle help -q 2>/tmp/gradle-stderr.log || {
   ESCAPED=$(cat /tmp/gradle-stderr.log | head -200 | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
@@ -183,12 +182,6 @@ curl -sf -X POST "$CALLBACK_URL" -H "Content-Type: application/json" --data-bina
 								DefaultMode: int32Ptr(0400),
 							},
 						}},
-						{Name: "gradle-cache", VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: data.GradleCachePVC,
-								ReadOnly:  true,
-							},
-						}},
 					},
 					InitContainers: []corev1.Container{
 						{
@@ -208,7 +201,6 @@ curl -sf -X POST "$CALLBACK_URL" -H "Content-Type: application/json" --data-bina
 							Image:      data.JDKImagePrefix + ":" + data.JDK,
 							WorkingDir: "/work/src",
 							Env: []corev1.EnvVar{
-								{Name: "GRADLE_USER_HOME", Value: "/gradle-cache"},
 								{Name: "CALLBACK_URL", Value: callbackURL},
 							},
 							Command: []string{"sh", "-c"},
@@ -216,7 +208,6 @@ curl -sf -X POST "$CALLBACK_URL" -H "Content-Type: application/json" --data-bina
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "workspace", MountPath: "/work"},
 								{Name: "init-script", MountPath: "/scripts", ReadOnly: true},
-								{Name: "gradle-cache", MountPath: "/gradle-cache", ReadOnly: true},
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{

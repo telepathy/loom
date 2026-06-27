@@ -245,12 +245,10 @@ func (e *LocalExecutor) Execute(ctx context.Context, planID string, rs *model.Re
 	gradlew := filepath.Join(workDir, "gradlew")
 	_ = os.Chmod(gradlew, 0755) // 确保可执行
 
-	gradleCache := filepath.Join(e.workDirBase, "loom", "gradle-cache")
 	gradleCmd := exec.CommandContext(ctx, gradlew,
 		"--init-script", initScript,
 		"help", "-q")
 	gradleCmd.Dir = workDir
-	gradleCmd.Env = append(os.Environ(), "GRADLE_USER_HOME="+gradleCache)
 
 	if out, err := gradleCmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("gradlew failed: %w\n%s", err, string(out))

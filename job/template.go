@@ -20,7 +20,6 @@ import (
 //   - Namespace: K8s namespace
 //   - ConfigmapName: init script ConfigMap 名称
 //   - SSHSecretName: SSH 私钥 Secret 名称
-//   - GradleCachePVC: Gradle 发行版缓存 PVC 名称
 //   - JobTimeout: activeDeadlineSeconds
 type JobTemplateData struct {
 	RepoID          string
@@ -38,7 +37,6 @@ type JobTemplateData struct {
 	Namespace      string
 	ConfigmapName  string
 	SSHSecretName  string
-	GradleCachePVC string
 	JobTimeout     int
 	AkashaAPIURL   string // akasha gradle.properties API URL，空则跳过
 }
@@ -76,10 +74,6 @@ spec:
           secret:
             secretName: {{.SSHSecretName}}
             defaultMode: 0400
-        - name: gradle-cache
-          persistentVolumeClaim:
-            claimName: {{.GradleCachePVC}}
-            readOnly: true
       initContainers:
         - name: clone
           image: {{.GitImage}}
@@ -101,8 +95,6 @@ spec:
           image: {{.JDKImagePrefix}}:{{.JDK}}
           workingDir: /work/src
           env:
-            - name: GRADLE_USER_HOME
-              value: /gradle-cache
             - name: CALLBACK_URL
               value: "{{.CallbackBaseURL}}/das/callback?plan_id={{.PlanID}}&repo_id={{.RepoID}}&tag={{.Tag}}"
           command: ["sh", "-c"]
@@ -125,9 +117,6 @@ spec:
               mountPath: /work
             - name: init-script
               mountPath: /scripts
-              readOnly: true
-            - name: gradle-cache
-              mountPath: /gradle-cache
               readOnly: true
           resources:
             requests:
