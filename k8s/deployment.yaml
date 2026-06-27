@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gps-das
+  namespace: gps
+  labels:
+    app: gps-das
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gps-das
+  template:
+    metadata:
+      labels:
+        app: gps-das
+    spec:
+      serviceAccountName: das
+      containers:
+        - name: das
+          image: registry/gps-das:v0.0.1
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            # ── 服务 ──
+            - name: DAS_PORT
+              value: "8080"
+            # ── K8s 集群 ──
+            - name: DAS_K8S_NAMESPACE
+              value: "gps"
+            - name: DAS_GIT_IMAGE
+              value: "registry/gps-das-git:latest"
+            - name: DAS_JDK_IMAGE_PREFIX
+              value: "registry/gps-das-jdk"
+            - name: DAS_DEFAULT_JDK
+              value: "17"
+            - name: DAS_CONFIGMAP_NAME
+              value: "das-init-script"
+            - name: DAS_SSH_SECRET_NAME
+              value: "codeup-ssh"
+            - name: DAS_GRADLE_CACHE_PVC
+              value: "gradle-dist-cache"
+            # ── 运行参数 ──
+            - name: DAS_MAX_PARALLEL
+              value: "5"
+            - name: DAS_JOB_TIMEOUT
+              value: "600"
+            - name: DAS_PLAN_TTL
+              value: "3600"
+            # ── 持久化 ──
+            - name: DAS_MYSQL_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: loom-mysql
+                  key: dsn
+            # ── 外部系统 ──
+            - name: DAS_AKASHA_API_URL
+              value: "http://akasha.gps.svc:8080/api/v1/gradle-properties"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /das/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /das/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30

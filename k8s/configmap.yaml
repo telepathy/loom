@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: das-init-script
+  namespace: gps
+data:
+  das.gradle: |
+    import org.gradle.api.artifacts.ProjectDependency
+    import org.gradle.api.artifacts.ExternalModuleDependency
+    import groovy.json.JsonOutput
+
+    gradle.projectsEvaluated {
+        def out = [subprojects: [], edges: []]
+
+        rootProject.allprojects.each { p ->
+            // ---- 坐标 GA ----
+            def artifact = p.name
+            def pub = p.extensions.findByName('publishing')
+            if (pub) {
+                try {
+                    def mp = pub.publications.find { it.hasProperty('artifactId') }
+                    if (mp) artifact = mp.artifactId
+                } catch (ignored) {}
+            }
+            out.subprojects << [
+                gradle_path: p.path,
+                group      : p.group?.toString(),
+                artifact   : artifact,
+                version    : p.version?.toString()
+            ]
+
+            // ---- 声明依赖（只读 declared，不触发解析）----
+            def seen = [] as Set
+            p.configurations.each { c ->
+                if (c.name.toLowerCase().contains('test')) return
+                c.dependencies.each { d ->
+                    if (d instanceof ProjectDependency) {
+                        def path = d.hasProperty('path') ? d.path : d.dependencyProject.path
+                        if (seen.add("P:$path"))
+                            out.edges << [from: path, to: p.path, type: 'project']
+                    } else if (d instanceof ExternalModuleDependency) {
+                        if (seen.add("E:${d.group}:${d.name}"))
+                            out.edges << [from: "${d.group}:${d.name}:${d.version}", to: p.path, type: 'external']
+                    }
+                }
+            }
+        }
+        new File(gradle.rootProject.projectDir, 'das-output.json').text = JsonOutput.toJson(out)
+    }
