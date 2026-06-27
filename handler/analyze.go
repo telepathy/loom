@@ -165,7 +165,7 @@ func (h *AnalyzeHandler) SelfAnalyze(c *gin.Context) {
 			RepoID:  r.ID,
 			RepoURL: r.URL,
 			Branch:  r.ReleaseBranch, // 发布分支作为分析目标
-			JDK:     "17",            // 默认 JDK
+			JDK:     r.JDK,           // 从 gps_repos 读取的 JDK 版本
 			Status:  model.RepoPending,
 		}
 	}

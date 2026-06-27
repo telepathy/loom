@@ -18,6 +18,7 @@ type RepoRow struct {
 	Name          string
 	URL           string
 	ReleaseBranch string
+	JDK           string // JDK 大版本（"8"/"17"/"21"），默认 "17"
 }
 
 // Open 打开 MySQL 连接并验证可达性。
@@ -43,7 +44,7 @@ func QueryRepos(ctx context.Context, db *sql.DB, siloIDs []string) ([]RepoRow, e
 
 	if len(siloIDs) == 0 {
 		rows, err = db.QueryContext(ctx,
-			"SELECT id, silo_id, name, url, release_branch FROM gps_repos ORDER BY silo_id, name")
+			"SELECT id, silo_id, name, url, release_branch, COALESCE(jdk,'17') FROM gps_repos ORDER BY silo_id, name")
 	} else {
 		placeholders := make([]string, len(siloIDs))
 		args := make([]interface{}, len(siloIDs))
@@ -52,7 +53,7 @@ func QueryRepos(ctx context.Context, db *sql.DB, siloIDs []string) ([]RepoRow, e
 			args[i] = id
 		}
 		query := fmt.Sprintf(
-			"SELECT id, silo_id, name, url, release_branch FROM gps_repos WHERE silo_id IN (%s) ORDER BY silo_id, name",
+			"SELECT id, silo_id, name, url, release_branch, COALESCE(jdk,'17') FROM gps_repos WHERE silo_id IN (%s) ORDER BY silo_id, name",
 			strings.Join(placeholders, ","))
 		rows, err = db.QueryContext(ctx, query, args...)
 	}
@@ -64,7 +65,7 @@ func QueryRepos(ctx context.Context, db *sql.DB, siloIDs []string) ([]RepoRow, e
 	var out []RepoRow
 	for rows.Next() {
 		var r RepoRow
-		if err := rows.Scan(&r.ID, &r.SiloID, &r.Name, &r.URL, &r.ReleaseBranch); err != nil {
+		if err := rows.Scan(&r.ID, &r.SiloID, &r.Name, &r.URL, &r.ReleaseBranch, &r.JDK); err != nil {
 			return nil, fmt.Errorf("scan gps_repos row: %w", err)
 		}
 		out = append(out, r)
