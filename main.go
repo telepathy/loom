@@ -136,6 +136,7 @@ func main() {
 
 	// API — 历史查询
 	r.GET("/das/plans", planQH.ListPlans)
+	r.GET("/das/repos", planQH.ListRepos)
 	r.GET("/das/plans/:plan_id", planQH.PlanDetail)
 
 	// ── HTTP 服务 ──

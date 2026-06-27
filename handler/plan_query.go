@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/telepathy/loom/db"
 	"github.com/telepathy/loom/model"
 	"github.com/telepathy/loom/store"
 )
@@ -100,4 +101,28 @@ func (h *PlanQueryHandler) PlanDetail(c *gin.Context) {
 		},
 		Repos: repos,
 	})
+}
+
+// ListRepos 处理 GET /das/repos。
+func (h *PlanQueryHandler) ListRepos(c *gin.Context) {
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, model.ErrorResponse{Error: "DAS_MYSQL_DSN not configured"})
+		return
+	}
+	rows, err := db.QueryRepos(c.Request.Context(), h.db, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Error: "failed to query repos: " + err.Error()})
+		return
+	}
+	type repoItem struct {
+		ID            string `json:"id"`
+		SiloID        string `json:"silo_id"`
+		Name          string `json:"name"`
+		ReleaseBranch string `json:"release_branch"`
+	}
+	items := make([]repoItem, len(rows))
+	for i, r := range rows {
+		items[i] = repoItem{ID: r.ID, SiloID: r.SiloID, Name: r.Name, ReleaseBranch: r.ReleaseBranch}
+	}
+	c.JSON(http.StatusOK, gin.H{"repos": items})
 }

@@ -153,6 +153,26 @@ func (h *AnalyzeHandler) SelfAnalyze(c *gin.Context) {
 	if len(repoRows) == 0 {
 		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "no repos found (check silo_ids filter or gps_repos table)"})
 		return
+
+		// 如果指定了 repo_ids，精确过滤
+		if len(req.RepoIDs) > 0 {
+			idSet := make(map[string]bool, len(req.RepoIDs))
+			for _, id := range req.RepoIDs {
+				idSet[id] = true
+			}
+			filtered := repoRows[:0]
+			for _, r := range repoRows {
+				if idSet[r.ID] {
+					filtered = append(filtered, r)
+				}
+			}
+			repoRows = filtered
+		}
+
+		if len(repoRows) == 0 {
+			c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "no repos found (check filter or gps_repos table)"})
+			return
+		}
 	}
 
 	// 生成 plan_id

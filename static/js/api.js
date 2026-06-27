@@ -22,10 +22,11 @@ const API = {
         return res.json();
     },
 
-    // Plan queries
-    getPlans()         { return this.get('/das/plans'); },
-    getPlanDetail(id)  { return this.get('/das/plans/' + id); },
+    getPlans()           { return this.get('/das/plans'); },
+    getPlanDetail(id)    { return this.get('/das/plans/' + id); },
     getAnalyzeStatus(id) { return this.get('/das/analyze/' + id); },
+    getRepos()           { return this.get('/das/repos'); },
+    selfAnalyze(data)    { return this.post('/das/analyze/self', data); },
 };
 
 // Utilities

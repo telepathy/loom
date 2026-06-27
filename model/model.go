@@ -50,7 +50,8 @@ type RepoInput struct {
 // SelfAnalyzeRequest 是 POST /das/analyze/self 的请求体。
 // DAS 自驱动模式：从 gps_repos 表读取仓库列表，以发布分支为分析目标。
 type SelfAnalyzeRequest struct {
-	SiloIDs      []string `json:"silo_ids"`                 // 可选：按 silo 过滤，空则分析全部
+	SiloIDs      []string `json:"silo_ids"`                        // 可选：按 silo 过滤
+	RepoIDs      []string `json:"repo_ids"`                        // 可选：按 repo_id 精确选择
 	AkashaBranch string   `json:"akasha_branch" binding:"required"` // akasha 依赖分支
 }
 
