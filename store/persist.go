@@ -20,6 +20,9 @@ type Persister interface {
 
 	// MarkPlanCompleted 在所有 repo 终态后更新 plan 状态为 COMPLETED。
 	MarkPlanCompleted(ctx context.Context, planID string) error
+
+	// DeletePlanData 删除指定 plan 在所有 loom_* 表中的数据。用于清理未完成的计划。
+	DeletePlanData(ctx context.Context, planID string) error
 }
 
 // --- SQL Persister 实现 ---
@@ -130,6 +133,24 @@ func (p *sqlPersister) MarkPlanCompleted(ctx context.Context, planID string) err
 		`UPDATE loom_analysis_plans SET status='COMPLETED', completed_at=? WHERE plan_id=?`,
 		now, planID)
 	return err
+}
+
+func (p *sqlPersister) DeletePlanData(ctx context.Context, planID string) error {
+	tx, err := p.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("delete plan data: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 先删子表，再删主表
+	tables := []string{"loom_edges", "loom_subprojects", "loom_analysis_repos", "loom_analysis_plans"}
+	for _, table := range tables {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE plan_id=?", planID); err != nil {
+			return fmt.Errorf("delete plan data: %s: %w", table, err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 // --- 查询（供 handler 使用） ---
@@ -271,6 +292,7 @@ func QueryPlanDetail(ctx context.Context, db *sql.DB, planID string) (*PlanDetai
 
 type noopPersister struct{}
 
-func (*noopPersister) PersistPlan(ctx context.Context, plan *model.PlanState) error          { return nil }
+func (*noopPersister) PersistPlan(ctx context.Context, plan *model.PlanState) error                { return nil }
 func (*noopPersister) PersistRepoResult(ctx context.Context, planID string, rs *model.RepoState) error { return nil }
-func (*noopPersister) MarkPlanCompleted(ctx context.Context, planID string) error             { return nil }
+func (*noopPersister) MarkPlanCompleted(ctx context.Context, planID string) error                      { return nil }
+func (*noopPersister) DeletePlanData(ctx context.Context, planID string) error                         { return nil }

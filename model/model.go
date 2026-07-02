@@ -125,6 +125,14 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+// CleanupResponse 是 POST /das/cleanup 的响应体。
+type CleanupResponse struct {
+	K8sJobsDeleted int      `json:"k8s_jobs_deleted"`
+	PlansRemoved   int      `json:"plans_removed"`
+	DBPlansDeleted int      `json:"db_plans_deleted"`
+	Errors         []string `json:"errors,omitempty"`
+}
+
 // ──────────────────────────────────────────────
 // 内部状态（§7.3）
 // ──────────────────────────────────────────────

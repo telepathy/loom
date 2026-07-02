@@ -92,6 +92,7 @@ All settings via environment variables.
 | `DAS_DEFAULT_JDK` | `17` | Default JDK major version |
 | `DAS_CONFIGMAP_NAME` | `das-init-script` | das.gradle ConfigMap name |
 | `DAS_SSH_SECRET_NAME` | `codeup-ssh` | Git SSH private key Secret name |
+| `DAS_IMAGE_PULL_SECRETS` | — | Comma-separated image pull Secret names (e.g. `regcred,regcred2`) |
 | `DAS_KUBECONFIG` | — | Local dev kubeconfig path (empty = in-cluster) |
 | `DAS_DEBUG_JOB_YAML` | `false` | Write rendered Job YAML to `/tmp` |
 

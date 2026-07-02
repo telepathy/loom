@@ -28,9 +28,10 @@ import (
 //  3. Watch Job 直到完成或超时
 //  4. 结果由 Job 内 curl 回调 /das/callback 写入 store + DB
 type K8sExecutor struct {
-	clientset *kubernetes.Clientset
-	namespace string
-	cfg       *config.Config
+	clientset        *kubernetes.Clientset
+	namespace        string
+	cfg              *config.Config
+	imagePullSecrets []string
 }
 
 // NewK8sExecutor 创建 K8s 执行器。
@@ -55,9 +56,10 @@ func NewK8sExecutor(cfg *config.Config, kubeconfig string) (*K8sExecutor, error)
 	}
 
 	return &K8sExecutor{
-		clientset: clientset,
-		namespace: cfg.K8sNamespace,
-		cfg:       cfg,
+		clientset:        clientset,
+		namespace:        cfg.K8sNamespace,
+		cfg:              cfg,
+		imagePullSecrets: cfg.ImagePullSecrets,
 	}, nil
 }
 
@@ -79,20 +81,22 @@ func (e *K8sExecutor) Execute(ctx context.Context, planID string, rs *model.Repo
 
 	// 创建 Job
 	_, err := e.createJob(ctx, JobTemplateData{
-		RepoID:          rs.RepoID,
-		PlanID:          planID,
-		RepoURL:         rs.RepoURL,
-		Tag:             rs.Tag,
-		Branch:          rs.Branch,
-		JDK:             jdk,
-		AkashaBranch:    akashaBranch,
-		CallbackBaseURL: "http://gps-das." + e.namespace + ".svc:8080",
-		GitImage:        e.cfg.GitImage,
-		JDKImagePrefix:  e.cfg.JDKImagePrefix,
-		Namespace:       e.namespace,
-		ConfigmapName:   e.cfg.ConfigmapName,
-		SSHSecretName:   e.cfg.SSHSecretName,
-		JobTimeout:      e.cfg.JobTimeout,
+		RepoID:           rs.RepoID,
+		PlanID:           planID,
+		RepoURL:          rs.RepoURL,
+		Tag:              rs.Tag,
+		Branch:           rs.Branch,
+		JDK:              jdk,
+		AkashaBranch:     akashaBranch,
+		CallbackBaseURL:  "http://gps-das." + e.namespace + ".svc:8080",
+		GitImage:         e.cfg.GitImage,
+		JDKImagePrefix:   e.cfg.JDKImagePrefix,
+		Namespace:        e.namespace,
+		ConfigmapName:    e.cfg.ConfigmapName,
+		SSHSecretName:    e.cfg.SSHSecretName,
+		JobTimeout:       e.cfg.JobTimeout,
+		AkashaAPIURL:     e.cfg.AkashaAPIURL,
+		ImagePullSecrets: e.cfg.ImagePullSecrets,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("k8s create job: %w", err)
@@ -136,7 +140,7 @@ func (e *K8sExecutor) createJob(ctx context.Context, data JobTemplateData) (*bat
 ref=%s
 git clone --depth 1 --branch $ref %s /work/src
 chmod -R u+w /work/src%s`,
-		refStr(data), data.RepoURL, akashaFetchScript(e.cfg.AkashaAPIURL, data.AkashaBranch))
+		refStr(data), data.RepoURL, akashaFetchScript(data.AkashaAPIURL, data.AkashaBranch))
 
 	// analyze container 脚本：gradlew → 回调
 	analyzeScript := `set -e
@@ -168,8 +172,8 @@ curl -sf -X POST "$CALLBACK_URL" -H "Content-Type: application/json" --data-bina
 					Labels: map[string]string{"app": "gps-das", "plan": data.PlanID},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-						ImagePullSecrets:   buildImagePullSecrets(e.cfg.ImagePullSecrets),
+					RestartPolicy:    corev1.RestartPolicyNever,
+					ImagePullSecrets: e.buildImagePullSecrets(),
 					Volumes: []corev1.Volume{
 						{Name: "workspace", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 						{Name: "init-script", VolumeSource: corev1.VolumeSource{
@@ -225,6 +229,17 @@ curl -sf -X POST "$CALLBACK_URL" -H "Content-Type: application/json" --data-bina
 				},
 			},
 		},
+	}
+
+	// 记录 imagePullSecrets 配置
+	if secrets := e.buildImagePullSecrets(); len(secrets) > 0 {
+		var names []string
+		for _, s := range secrets {
+			names = append(names, s.Name)
+		}
+		log.Printf("[k8s] job %s: imagePullSecrets=%v", jobName, names)
+	} else {
+		log.Printf("[k8s] job %s: no imagePullSecrets configured (DAS_IMAGE_PULL_SECRETS not set)", jobName)
 	}
 
 	return e.clientset.BatchV1().Jobs(e.namespace).Create(ctx, job, metav1.CreateOptions{})
@@ -290,17 +305,53 @@ func akashaFetchScript(apiURL, branch string) string {
 		apiURL, branch)
 }
 
-func int32Ptr(i int32) *int32 { return &i }
-func int64Ptr(i int64) *int64 { return &i }
-
-// buildImagePullSecrets converts secret names to K8s LocalObjectReference list.
-func buildImagePullSecrets(names []string) []corev1.LocalObjectReference {
-	if len(names) == 0 {
+// buildImagePullSecrets 将配置中的 secret 名称列表转换为 K8s API 对象。
+func (e *K8sExecutor) buildImagePullSecrets() []corev1.LocalObjectReference {
+	if len(e.imagePullSecrets) == 0 {
 		return nil
 	}
-	refs := make([]corev1.LocalObjectReference, len(names))
-	for i, n := range names {
-		refs[i] = corev1.LocalObjectReference{Name: n}
+	refs := make([]corev1.LocalObjectReference, 0, len(e.imagePullSecrets))
+	for _, name := range e.imagePullSecrets {
+		refs = append(refs, corev1.LocalObjectReference{Name: name})
 	}
 	return refs
 }
+
+// CleanupIncompleteJobs 列出所有 label=app=gps-das 的 Job，删除其中未完成的部分，返回删除数量。
+func (e *K8sExecutor) CleanupIncompleteJobs(ctx context.Context) (int, error) {
+	jobList, err := e.clientset.BatchV1().Jobs(e.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "app=gps-das",
+	})
+	if err != nil {
+		return 0, fmt.Errorf("list k8s jobs: %w", err)
+	}
+
+	var deleted int
+	dp := metav1.DeletePropagationBackground
+	for _, job := range jobList.Items {
+		terminal := false
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobComplete || cond.Type == batchv1.JobFailed {
+				terminal = true
+				break
+			}
+		}
+		if terminal {
+			continue
+		}
+
+		if err := e.clientset.BatchV1().Jobs(e.namespace).Delete(ctx, job.Name, metav1.DeleteOptions{
+			PropagationPolicy: &dp,
+		}); err != nil {
+			log.Printf("[k8s] cleanup: delete job %s: %v", job.Name, err)
+			continue
+		}
+		deleted++
+		log.Printf("[k8s] cleanup: deleted incomplete job %s", job.Name)
+	}
+
+	return deleted, nil
+}
+
+func int32Ptr(i int32) *int32 { return &i }
+func int64Ptr(i int64) *int64 { return &i }

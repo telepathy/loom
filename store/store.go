@@ -112,6 +112,19 @@ func (s *Store) AllInTerminalState(planID string) (bool, bool) {
 	return true, true
 }
 
+// GetInProgressPlanIDs 返回所有处于 IN_PROGRESS 状态的 plan ID 列表。
+func (s *Store) GetInProgressPlanIDs() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var ids []string
+	for id, plan := range s.plans {
+		if plan.Status == model.PlanInProgress {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // ──────────────────────────────────────────────
 // TTL 清理
 // ──────────────────────────────────────────────

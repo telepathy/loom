@@ -65,6 +65,12 @@ spec:
         plan: "{{.PlanID}}"
     spec:
       restartPolicy: Never
+      {{if .ImagePullSecrets}}
+      imagePullSecrets:
+        {{- range .ImagePullSecrets}}
+        - name: {{.}}
+        {{- end}}
+      {{end}}
       volumes:
         - name: workspace
           emptyDir: {}

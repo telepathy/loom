@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -123,6 +124,7 @@ func (h *AnalyzeHandler) Analyze(c *gin.Context) {
 //
 //	{
 //	  "silo_ids": ["silo-001"],       // 可选，空则分析全部
+//	  "repo_ids": ["repo-001"],       // 可选，空则分析全部
 //	  "akasha_branch": "202603"       // 必填
 //	}
 //
@@ -144,35 +146,35 @@ func (h *AnalyzeHandler) SelfAnalyze(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[api] self-analyze: silo_ids=%v, repo_ids=%v (count=%d)", req.SiloIDs, req.RepoIDs, len(req.RepoIDs))
+
 	// 查询 gps_repos 表
 	repoRows, err := db.QueryRepos(c.Request.Context(), h.db, req.SiloIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Error: "failed to query repos: " + err.Error()})
 		return
 	}
+	log.Printf("[api] self-analyze: DB returned %d repos", len(repoRows))
+
+	// 如果指定了 repo_ids，精确过滤
+	if len(req.RepoIDs) > 0 {
+		idSet := make(map[string]bool, len(req.RepoIDs))
+		for _, id := range req.RepoIDs {
+			idSet[id] = true
+		}
+		filtered := repoRows[:0]
+		for _, r := range repoRows {
+			if idSet[r.ID] {
+				filtered = append(filtered, r)
+			}
+		}
+		log.Printf("[api] self-analyze: filtered %d → %d repos by repo_ids", len(repoRows), len(filtered))
+		repoRows = filtered
+	}
+
 	if len(repoRows) == 0 {
 		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "no repos found (check silo_ids filter or gps_repos table)"})
 		return
-
-		// 如果指定了 repo_ids，精确过滤
-		if len(req.RepoIDs) > 0 {
-			idSet := make(map[string]bool, len(req.RepoIDs))
-			for _, id := range req.RepoIDs {
-				idSet[id] = true
-			}
-			filtered := repoRows[:0]
-			for _, r := range repoRows {
-				if idSet[r.ID] {
-					filtered = append(filtered, r)
-				}
-			}
-			repoRows = filtered
-		}
-
-		if len(repoRows) == 0 {
-			c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "no repos found (check filter or gps_repos table)"})
-			return
-		}
 	}
 
 	// 生成 plan_id

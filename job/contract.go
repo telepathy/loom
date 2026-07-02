@@ -45,6 +45,10 @@ type AnalysisResult struct {
 //     Execute 返回 (nil, nil) 表示成功，(nil, error) 表示失败。
 type Executor interface {
 	Execute(ctx context.Context, planID string, rs *model.RepoState, akashaBranch string) (*AnalysisResult, error)
+
+	// CleanupIncompleteJobs 删除所有未完成的 K8s Job，返回删除数量。
+	// 非 K8s 模式返回 (0, nil)。
+	CleanupIncompleteJobs(ctx context.Context) (int, error)
 }
 
 // ──────────────────────────────────────────────
@@ -270,6 +274,11 @@ func (e *LocalExecutor) Execute(ctx context.Context, planID string, rs *model.Re
 	log.Printf("[local] repo %s: %d subprojects, %d edges\n",
 		rs.RepoID, len(result.Subprojects), len(result.Edges))
 	return &result, nil
+}
+
+// CleanupIncompleteJobs 在本地模式下为空操作（无 K8s Job 需要清理）。
+func (e *LocalExecutor) CleanupIncompleteJobs(ctx context.Context) (int, error) {
+	return 0, nil
 }
 
 // ──────────────────────────────────────────────

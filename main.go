@@ -107,6 +107,7 @@ func main() {
 	analyzeH := handler.NewAnalyzeHandler(memStore, cfg.MaxParallel, jobManager, database)
 	callbackH := handler.NewCallbackHandler(memStore, persister)
 	planQH := handler.NewPlanQueryHandler(memStore, database)
+		cleanupH := handler.NewCleanupHandler(memStore, persister, exe)
 
 	// ── 前端静态文件 ──
 	staticFS, err := fs.Sub(staticFiles, "static")
@@ -133,6 +134,7 @@ func main() {
 	r.POST("/das/analyze/self", analyzeH.SelfAnalyze)
 	r.GET("/das/analyze/:plan_id", analyzeH.Status)
 	r.POST("/das/callback", callbackH.Callback)
+		r.POST("/das/cleanup", cleanupH.Cleanup)
 
 	// API — 历史查询
 	r.GET("/das/plans", planQH.ListPlans)
@@ -214,4 +216,8 @@ func (e *k8sExecutorStub) Execute(ctx context.Context, planID string, rs *model.
 	// K8s 模式：Execute 返回 nil result，store 由 HTTP callback 更新
 	log.Printf("[K8s stub] repo %s: simulation complete (awaiting callback)\n", rs.RepoID)
 	return nil, nil
+}
+
+func (e *k8sExecutorStub) CleanupIncompleteJobs(ctx context.Context) (int, error) {
+	return 0, nil
 }

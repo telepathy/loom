@@ -668,6 +668,7 @@ das/
 | `DAS_PLAN_TTL` | — | `3600` | 计划结果在内存中保留的秒数（过期自动清理） |
 | `DAS_CONFIGMAP_NAME` | — | `das-init-script` | init script ConfigMap 名称 |
 | `DAS_SSH_SECRET_NAME` | — | `codeup-ssh` | git ssh 私钥 Secret 名称 |
+| `DAS_IMAGE_PULL_SECRETS` | — | — | 镜像拉取 Secret 名称列表，逗号分隔（如 `regcred,regcred2`） |
 | `DAS_GRADLE_CACHE_PVC` | — | `gradle-dist-cache` | Gradle 发行版缓存 PVC 名称 |
 
 ### 7.3 内存状态模型
