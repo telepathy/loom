@@ -55,6 +55,8 @@ spec:
             # ── 外部系统 ──
             - name: DAS_AKASHA_API_URL
               value: "http://akasha.gps.svc:8080/api/v1/gradle-properties"
+            - name: DAS_IMAGE_PULL_SECRETS
+              value: "default-registry-key"
           resources:
             requests:
               cpu: "100m"

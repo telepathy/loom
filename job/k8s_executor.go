@@ -169,6 +169,7 @@ curl -sf -X POST "$CALLBACK_URL" -H "Content-Type: application/json" --data-bina
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
+						ImagePullSecrets:   buildImagePullSecrets(e.cfg.ImagePullSecrets),
 					Volumes: []corev1.Volume{
 						{Name: "workspace", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 						{Name: "init-script", VolumeSource: corev1.VolumeSource{
@@ -291,3 +292,15 @@ func akashaFetchScript(apiURL, branch string) string {
 
 func int32Ptr(i int32) *int32 { return &i }
 func int64Ptr(i int64) *int64 { return &i }
+
+// buildImagePullSecrets converts secret names to K8s LocalObjectReference list.
+func buildImagePullSecrets(names []string) []corev1.LocalObjectReference {
+	if len(names) == 0 {
+		return nil
+	}
+	refs := make([]corev1.LocalObjectReference, len(names))
+	for i, n := range names {
+		refs[i] = corev1.LocalObjectReference{Name: n}
+	}
+	return refs
+}

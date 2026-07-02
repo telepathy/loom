@@ -38,7 +38,8 @@ type JobTemplateData struct {
 	ConfigmapName  string
 	SSHSecretName  string
 	JobTimeout     int
-	AkashaAPIURL   string // akasha gradle.properties API URL，空则跳过
+	AkashaAPIURL      string // akasha gradle.properties API URL，空则跳过
+	ImagePullSecrets   []string // imagePullSecrets 名称列表
 }
 
 // jobYAML 是 K8s Job 的 Go template。
